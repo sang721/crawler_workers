@@ -2,8 +2,7 @@ import html
 import re
 import scrapy
 from urllib.parse import urljoin
-import cloudscraper
-from cloudscraper import create_scraper
+from scrapy_redis.spiders import RedisSpider
 
 
 # scraper = create_scraper()
@@ -14,13 +13,13 @@ from cloudscraper import create_scraper
 #             return new_request
 
 
-class spider(scrapy.Spider):
+class spider(RedisSpider):
     # handle_httpstatus_list = [301, 302]
     name = "posts"
-
-    def start_requests(self):
-        urls = ['https://m.batdongsan.com.vn/nha-dat-cho-thue/p{}'.format(x) for x in range(1, 9600)]
-        return [scrapy.Request(url=url, callback=self.parse) for url in urls]
+    redis_key = "BDS_URLS"
+    # def start_requests(self):
+    #     urls = ['https://m.batdongsan.com.vn/nha-dat-cho-thue/p{}'.format(x) for x in range(1, 9600)]
+    #     return [scrapy.Request(url=url, callback=self.parse) for url in urls]
 
     def parse(self, response):
         products = response.xpath("//ul[@id = 'product-list-wap']//li/a/@href").extract()
@@ -85,14 +84,21 @@ class spider(scrapy.Spider):
 
 
 from scrapy.crawler import CrawlerProcess
-from scrapy.crawler import CrawlerRunner
 
-process_2 = CrawlerProcess({
-    'FEED_URI': 'BDS.csv',
-    'FEED_FORMAT': 'csv',
-    #     'DOWNLOADER_MIDDLEWARES' : {
-    #     '__main__.CloudMiddleware': 400,
-    # },
+process = CrawlerProcess({
+    "REDIS_ITEMS_KEY": "bds_net:items",
+    "CONCURRENT_REQUESTS": 16,
+    "RETRY_TIMES": 1000,
+    "ITEM_PIPELINES": {
+        'scrapy_redis.pipelines.RedisPipeline': 300
+    },
+    "REDIS_HOST": "localhost",
+    "REDIS_PORT": 6379,
+    "REDIS_PARAMS": {
+        'password': "usaf",
+        "db": 2
+    },
 })
-process_2.crawl(spider)
-process_2.start()
+
+process.crawl(spider)
+process.start()
